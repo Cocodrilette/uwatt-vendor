@@ -4,9 +4,17 @@ pragma solidity 0.8.19;
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
-contract UWattVendor is AccessControl {
+/**
+ * @title UWattVendor
+ * @notice This contracts was create to sell uWatt tokens at Blockchain Submit Latam 2023
+ *         and will be paused after the event.
+ * @custom:security-contact juan@unergy.io
+ */
+
+contract UWattVendor is AccessControl, Pausable {
     using SafeERC20 for IERC20;
 
     bytes32 constant WITHDRAWER = keccak256(abi.encode("WITHDRAWER"));
@@ -29,7 +37,9 @@ contract UWattVendor is AccessControl {
         uWattOwner = newUWattOwner;
     }
 
-    function sell(uint256 uWattAmount) external returns (bool success) {
+    function buy(
+        uint256 uWattAmount
+    ) external whenNotPaused returns (bool success) {
         address sender = msg.sender;
         uint256 usdtAmount = getUSDTAmount(uWattAmount);
 
@@ -46,11 +56,13 @@ contract UWattVendor is AccessControl {
         return true;
     }
 
-    function getUSDTAmount(uint256 uWattAmount) public view returns (uint256) {
+    function getUSDTAmount(
+        uint256 uWattAmount
+    ) public view whenNotPaused returns (uint256) {
         return Math.mulDiv(uWattAmount, swapFactor, 10 ** 18);
     }
 
-    function setSwapFactor(uint256 newSwapFactor) external {
+    function setSwapFactor(uint256 newSwapFactor) external whenNotPaused {
         swapFactor = newSwapFactor;
     }
 }

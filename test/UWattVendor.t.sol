@@ -8,13 +8,16 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract CounterTest is Test {
     UWattVendor public uWattVendor;
-    SimpleERC20 public ERC20_uWatt = new SimpleERC20();
+    SimpleERC20 public ERC20_uWatt;
     SimpleERC20 public ERC20_USDT = new SimpleERC20();
 
     address user1 = address(100);
     uint256 ERC20_INITIAL_AMOUNT = 100000 * 10 ** 18;
 
     function setUp() public {
+        ERC20_uWatt = new SimpleERC20();
+        ERC20_USDT = new SimpleERC20();
+
         ERC20_USDT.mint(address(this), ERC20_INITIAL_AMOUNT);
         ERC20_uWatt.mint(address(this), ERC20_INITIAL_AMOUNT);
 
@@ -29,12 +32,23 @@ contract CounterTest is Test {
 
     function test_getUSDAmount(uint256 uWattAmount) public {
         uint256 usdtAmount = uWattVendor.getUSDTAmount(uWattAmount);
-        console2.log("usdtAmount", usdtAmount);
 
         assertEq(
             usdtAmount,
             Math.mulDiv(uWattAmount, uWattVendor.swapFactor(), 10 ** 18)
         );
+    }
+
+    function test_buy(uint256 uWattAmount) public {
+        uint256 usdtAmount = uWattVendor.getUSDTAmount(uWattAmount);
+
+        vm.prank(user1);
+        ERC20_USDT.approve(address(uWattVendor), usdtAmount);
+
+        uWattVendor.buy(uWattAmount);
+
+        assertEq(ERC20_USDT.balanceOf(address(this)), usdtAmount);
+        assertEq(ERC20_uWatt.balanceOf(address(user1)), uWattAmount);
     }
 
     function test_withdraw() public {
@@ -43,10 +57,9 @@ contract CounterTest is Test {
         );
 
         address uWattOwner = uWattVendor.uWattOwner();
-        uint256 uWattOwnerBalaceBefore = uWattVendor.ERC20_uWatt().balanceOf(
-            uWattOwner
-        );
+        uint256 uWattOwnerBalaceBefore = ERC20_uWatt.balanceOf(uWattOwner);
 
+        vm.prank(uWattOwner);
         uWattVendor.withdraw();
 
         assertEq(
