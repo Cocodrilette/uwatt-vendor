@@ -19,6 +19,10 @@ contract UWattVendor is AccessControl, Pausable {
 
     bytes32 constant WITHDRAWER = keccak256(abi.encode("WITHDRAWER"));
 
+    uint256 constant SCALAR = 10 ** 18;
+    uint256 public constant MAXIMUM_AMOUNT = 1000 * SCALAR;
+    uint256 public constant MINIMUM_AMOUNT = 10 * SCALAR;
+
     uint256 public swapFactor = 808900; // 0.8089
     address public uWattOwner;
 
@@ -40,18 +44,26 @@ contract UWattVendor is AccessControl, Pausable {
     function buy(
         uint256 uWattAmount
     ) external whenNotPaused returns (bool success) {
+        if (uWattAmount < MINIMUM_AMOUNT)
+            revert("UWattVendor: amount is less than minimum");
+
         address sender = msg.sender;
+        uint256 balanceOfSender = ERC20_uWatt.balanceOf(sender);
+
+        if (balanceOfSender + uWattAmount > MAXIMUM_AMOUNT)
+            revert("UWattVendor: amount is greater than balance");
+
         uint256 usdtAmount = getUSDTAmount(uWattAmount);
 
-        ERC20_uWatt.safeTransferFrom(sender, address(this), usdtAmount);
-        ERC20_USDT.safeTransferFrom(uWattOwner, sender, uWattAmount);
+        ERC20_USDT.safeTransferFrom(sender, address(this), usdtAmount);
+        ERC20_uWatt.safeTransferFrom(uWattOwner, sender, uWattAmount);
 
         return true;
     }
 
     function withdraw() external onlyRole(WITHDRAWER) returns (bool success) {
         uint256 usdtBalance = ERC20_USDT.balanceOf(address(this));
-        ERC20_uWatt.safeTransfer(msg.sender, usdtBalance);
+        ERC20_USDT.safeTransfer(uWattOwner, usdtBalance);
 
         return true;
     }

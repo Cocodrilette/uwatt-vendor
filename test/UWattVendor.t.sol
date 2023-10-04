@@ -6,22 +6,30 @@ import {UWattVendor} from "../src/UWattVendor.sol";
 import {SimpleERC20} from "../src/SimpleERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-contract CounterTest is Test {
+contract UWattVendorTest is Test {
     UWattVendor public uWattVendor;
-    SimpleERC20 public ERC20_uWatt;
+    SimpleERC20 public ERC20_uWatt = new SimpleERC20();
     SimpleERC20 public ERC20_USDT = new SimpleERC20();
 
     address user1 = address(100);
+    address uWattOwner;
+
     uint256 ERC20_INITIAL_AMOUNT = 100000 * 10 ** 18;
 
     function setUp() public {
-        ERC20_uWatt = new SimpleERC20();
-        ERC20_USDT = new SimpleERC20();
+        uWattVendor = new UWattVendor(
+            address(ERC20_uWatt),
+            address(ERC20_USDT),
+            address(1)
+        );
 
-        ERC20_USDT.mint(address(this), ERC20_INITIAL_AMOUNT);
-        ERC20_uWatt.mint(address(this), ERC20_INITIAL_AMOUNT);
+        uWattOwner = uWattVendor.uWattOwner();
 
-        uWattVendor = new UWattVendor(address(1), address(2), address(3));
+        ERC20_USDT.mint(address(user1), ERC20_INITIAL_AMOUNT);
+        ERC20_uWatt.mint(address(uWattOwner), ERC20_INITIAL_AMOUNT);
+
+        vm.prank(uWattOwner);
+        ERC20_uWatt.approve(address(uWattVendor), type(uint256).max);
     }
 
     function test_setSwapFactor(uint256 newSwapFactor) public {
@@ -39,32 +47,60 @@ contract CounterTest is Test {
         );
     }
 
-    function test_buy(uint256 uWattAmount) public {
+    function test_buyLessThanMinumun() public {
+        uint256 uWattAmount = uWattVendor.MINIMUM_AMOUNT() - 1;
+
         uint256 usdtAmount = uWattVendor.getUSDTAmount(uWattAmount);
 
-        vm.prank(user1);
+        vm.startPrank(user1);
         ERC20_USDT.approve(address(uWattVendor), usdtAmount);
 
+        vm.expectRevert("UWattVendor: amount is less than minimum");
         uWattVendor.buy(uWattAmount);
+        vm.stopPrank();
+    }
 
-        assertEq(ERC20_USDT.balanceOf(address(this)), usdtAmount);
-        assertEq(ERC20_uWatt.balanceOf(address(user1)), uWattAmount);
+    function test_buyMoreThanMaximun() public {
+        uint256 uWattAmount = uWattVendor.MAXIMUM_AMOUNT() + 1;
+
+        uint256 usdtAmount = uWattVendor.getUSDTAmount(uWattAmount);
+
+        vm.startPrank(user1);
+        ERC20_USDT.approve(address(uWattVendor), usdtAmount);
+
+        vm.expectRevert("UWattVendor: amount is greater than balance");
+        uWattVendor.buy(uWattAmount);
+        vm.stopPrank();
+    }
+
+    function test_buy() public {
+        uint256 uWattAmount = uWattVendor.MINIMUM_AMOUNT() * 4;
+        uint256 usdtAmount = uWattVendor.getUSDTAmount(uWattAmount);
+
+        vm.startPrank(user1);
+        ERC20_USDT.approve(address(uWattVendor), usdtAmount);
+
+        bool success = uWattVendor.buy(uWattAmount);
+        if (!success) revert();
+        vm.stopPrank();
+
+        assertEq(ERC20_USDT.balanceOf(address(uWattVendor)), usdtAmount);
     }
 
     function test_withdraw() public {
-        uint256 thisUSDTBalance = uWattVendor.ERC20_USDT().balanceOf(
-            address(this)
-        );
+        uint256 uWattAmount = uWattVendor.MINIMUM_AMOUNT() * 4;
+        uint256 usdtAmount = uWattVendor.getUSDTAmount(uWattAmount);
 
-        address uWattOwner = uWattVendor.uWattOwner();
-        uint256 uWattOwnerBalaceBefore = ERC20_uWatt.balanceOf(uWattOwner);
+        vm.startPrank(user1);
+        ERC20_USDT.approve(address(uWattVendor), usdtAmount);
+
+        uWattVendor.buy(uWattAmount);
+        vm.stopPrank();
 
         vm.prank(uWattOwner);
-        uWattVendor.withdraw();
+        bool success = uWattVendor.withdraw();
+        if (!success) revert();
 
-        assertEq(
-            uWattVendor.ERC20_USDT().balanceOf(address(this)),
-            uWattOwnerBalaceBefore + thisUSDTBalance
-        );
+        assertEq(ERC20_USDT.balanceOf(address(uWattOwner)), usdtAmount);
     }
 }
