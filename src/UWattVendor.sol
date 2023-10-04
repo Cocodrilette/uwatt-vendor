@@ -7,13 +7,17 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
+error UWattVendor_AMOUNT_IS_LESS_THAN_MINIMUM();
+error UWattVendor_CANNOT_BUY_MORE_UWATTS();
+error UWattVendor_NO_MORE_UWATTS_TO_SELL();
+error UWattVendor_INVALID_VALUE();
+
 /**
  * @title UWattVendor
  * @notice This contracts was create to sell uWatt tokens at Blockchain Submit Latam 2023
  *         and will be paused after the event.
  * @custom:security-contact juan@unergy.io
  */
-
 contract UWattVendor is AccessControl, Pausable {
     using SafeERC20 for IERC20;
 
@@ -22,6 +26,9 @@ contract UWattVendor is AccessControl, Pausable {
     uint256 constant SCALAR = 10 ** 18;
     uint256 public constant MAXIMUM_AMOUNT = 1000 * SCALAR;
     uint256 public constant MINIMUM_AMOUNT = 10 * SCALAR;
+
+    uint256 public MAX_UWATTS_TO_SELL = 10000 * SCALAR;
+    uint256 public UWATTS_SOLD = 0;
 
     uint256 public swapFactor = 808900; // 0.8089
     address public uWattOwner;
@@ -45,15 +52,20 @@ contract UWattVendor is AccessControl, Pausable {
         uint256 uWattAmount
     ) external whenNotPaused returns (bool success) {
         if (uWattAmount < MINIMUM_AMOUNT)
-            revert("UWattVendor: amount is less than minimum");
+            revert UWattVendor_AMOUNT_IS_LESS_THAN_MINIMUM();
+
+        if (UWATTS_SOLD + uWattAmount > MAX_UWATTS_TO_SELL)
+            revert UWattVendor_NO_MORE_UWATTS_TO_SELL();
 
         address sender = msg.sender;
         uint256 balanceOfSender = ERC20_uWatt.balanceOf(sender);
 
         if (balanceOfSender + uWattAmount > MAXIMUM_AMOUNT)
-            revert("UWattVendor: amount is greater than balance");
+            revert UWattVendor_CANNOT_BUY_MORE_UWATTS();
 
         uint256 usdtAmount = getUSDTAmount(uWattAmount);
+
+        UWATTS_SOLD += uWattAmount;
 
         ERC20_USDT.safeTransferFrom(sender, address(this), usdtAmount);
         ERC20_uWatt.safeTransferFrom(uWattOwner, sender, uWattAmount);
@@ -74,7 +86,18 @@ contract UWattVendor is AccessControl, Pausable {
         return Math.mulDiv(uWattAmount, swapFactor, 10 ** 18);
     }
 
-    function setSwapFactor(uint256 newSwapFactor) external whenNotPaused {
+    function setSwapFactor(
+        uint256 newSwapFactor
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) whenNotPaused {
         swapFactor = newSwapFactor;
+    }
+
+    function setMaxUWattsToSell(
+        uint256 newMaxUWattsToSell
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) whenNotPaused {
+        if (newMaxUWattsToSell < UWATTS_SOLD)
+            revert UWattVendor_INVALID_VALUE();
+
+        MAX_UWATTS_TO_SELL = newMaxUWattsToSell;
     }
 }
