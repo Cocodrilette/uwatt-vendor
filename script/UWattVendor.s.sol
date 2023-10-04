@@ -18,7 +18,7 @@ contract UWattVendorScript is Script {
         if (block.chainid == 137) {
             uWattAddress = 0xdD875635231E68E846cE190b1396AC0295D9e577;
             usdtAddress = 0xc2132D05D31c914a87C6611C10748AEb04B58e8F;
-            newUWattOwner = address(1);
+            newUWattOwner = 0xa846cb52cc481dd6E223b1Cd2AbD49f17120AddE;
         } else {
             SimpleERC20 ERC20_uWatt = new SimpleERC20();
             SimpleERC20 ERC20_USDT = new SimpleERC20();
