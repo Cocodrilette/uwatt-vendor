@@ -30,11 +30,29 @@ contract UWattVendor is AccessControl, Pausable {
     uint256 public MAX_UWATTS_TO_SELL = 10000 * SCALAR;
     uint256 public UWATTS_SOLD = 0;
 
-    uint256 public swapFactor = 808900; // 0.8089
+    uint256 public swapFactor = 904048; // 0.904048 USDT per uWatt
     address public uWattOwner;
 
     IERC20 public ERC20_uWatt;
     IERC20 public ERC20_USDT;
+
+    event UWattVendor_UWATTS_PURCHASED(
+        address indexed sender,
+        uint256 indexed uWattAmount,
+        uint256 indexed usdtAmount
+    );
+    event UWattVendor_UWATTS_WITHDRAWN(
+        address indexed sender,
+        uint256 indexed uWattAmount
+    );
+    event UWattVendor_SWAP_FACTOR_UPDATED(
+        address indexed sender,
+        uint256 indexed newSwapFactor
+    );
+    event UWattVendor_MAX_UWATTS_TO_SELL_UPDATED(
+        address indexed sender,
+        uint256 indexed newMaxUWattsToSell
+    );
 
     constructor(
         address uWattAddress,
@@ -70,6 +88,8 @@ contract UWattVendor is AccessControl, Pausable {
         ERC20_USDT.safeTransferFrom(sender, address(this), usdtAmount);
         ERC20_uWatt.safeTransferFrom(uWattOwner, sender, uWattAmount);
 
+        emit UWattVendor_UWATTS_PURCHASED(sender, uWattAmount, usdtAmount);
+
         return true;
     }
 
@@ -77,19 +97,23 @@ contract UWattVendor is AccessControl, Pausable {
         uint256 usdtBalance = ERC20_USDT.balanceOf(address(this));
         ERC20_USDT.safeTransfer(uWattOwner, usdtBalance);
 
+        emit UWattVendor_UWATTS_WITHDRAWN(uWattOwner, usdtBalance);
+
         return true;
     }
 
     function getUSDTAmount(
         uint256 uWattAmount
     ) public view whenNotPaused returns (uint256) {
-        return Math.mulDiv(uWattAmount, swapFactor, 10 ** 18);
+        return Math.mulDiv(uWattAmount, swapFactor, SCALAR);
     }
 
     function setSwapFactor(
         uint256 newSwapFactor
     ) external onlyRole(DEFAULT_ADMIN_ROLE) whenNotPaused {
         swapFactor = newSwapFactor;
+
+        emit UWattVendor_SWAP_FACTOR_UPDATED(msg.sender, newSwapFactor);
     }
 
     function setMaxUWattsToSell(
@@ -99,5 +123,10 @@ contract UWattVendor is AccessControl, Pausable {
             revert UWattVendor_INVALID_VALUE();
 
         MAX_UWATTS_TO_SELL = newMaxUWattsToSell;
+
+        emit UWattVendor_MAX_UWATTS_TO_SELL_UPDATED(
+            msg.sender,
+            newMaxUWattsToSell
+        );
     }
 }
