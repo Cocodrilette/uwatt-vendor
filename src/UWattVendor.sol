@@ -24,8 +24,8 @@ contract UWattVendor is AccessControl, Pausable {
     bytes32 constant WITHDRAWER = keccak256(abi.encode("WITHDRAWER"));
 
     uint256 constant SCALAR = 10 ** 18;
-    uint256 public constant MAXIMUM_AMOUNT = 1000 * SCALAR;
-    uint256 public constant MINIMUM_AMOUNT = 10 * SCALAR;
+    uint256 public MAXIMUM_AMOUNT = 1000 * SCALAR;
+    uint256 public MINIMUM_AMOUNT = 10 * SCALAR;
 
     uint256 public MAX_UWATTS_TO_SELL = 10000 * SCALAR;
     uint256 public UWATTS_SOLD = 0;
@@ -52,6 +52,14 @@ contract UWattVendor is AccessControl, Pausable {
     event UWattVendor_MAX_UWATTS_TO_SELL_UPDATED(
         address indexed sender,
         uint256 indexed newMaxUWattsToSell
+    );
+    event UWattVendor_MAXIMUM_AMOUNT_UPDATED(
+        address indexed sender,
+        uint256 indexed newMaximumAmount
+    );
+    event UWattVendor_MINIMUM_AMOUNT_UPDATED(
+        address indexed sender,
+        uint256 indexed newMinimumAmount
     );
 
     constructor(
@@ -128,5 +136,24 @@ contract UWattVendor is AccessControl, Pausable {
             msg.sender,
             newMaxUWattsToSell
         );
+    }
+
+    function setMaximunAmount(
+        uint256 newMaximumAmount
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) whenNotPaused {
+        MAXIMUM_AMOUNT = newMaximumAmount;
+
+        emit UWattVendor_MAX_UWATTS_TO_SELL_UPDATED(
+            msg.sender,
+            newMaximumAmount
+        );
+    }
+
+    function setMinimunAmount(
+        uint256 newMinimumAmount
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) whenNotPaused {
+        MINIMUM_AMOUNT = newMinimumAmount;
+
+        emit UWattVendor_MINIMUM_AMOUNT_UPDATED(msg.sender, newMinimumAmount);
     }
 }
